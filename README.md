@@ -1,4 +1,5 @@
-# Real-Time Instance Segmentation &amp; Classification for Genetic Cytogenetics &amp; Microscopy
+# ChromoSeg-YOLO
+Real-Time Instance Segmentation & Automated Cytogenetics Engine
 
 ## Overview
 ChromoSeg-YOLO is an open-source, high-throughput computer vision pipeline engineered 
@@ -21,12 +22,14 @@ karyotyping workflows and biological feature extraction.
   comparing mAP@50-95, FPS latency, and memory footprint against standard baselines.
 
 ## Architecture
+```
 chromoseg/
 ├── data/          # COCO/Bio-Formats parsers & bio-augmentations
 ├── models/        # PyTorch backbones, attention heads, and custom loss layers
 ├── engine/        # Modular trainer, evaluator, and metric loggers
 ├── deploy/        # ONNX export and runtime wrappers
 └── benchmarks/    # Comparison scripts and W&B logging artifacts
+```
 
 ## License
 Distributed under the GNU Affero General Public License v3.0 (AGPL-3.0). 
