@@ -11,6 +11,12 @@ key challenges in automated cytogenetics—specifically severe chromosome overla
 variable fluorescence contrast, and complex morphological boundaries—to accelerate 
 karyotyping workflows and biological feature extraction.
 
+<div align="center">
+  <img src="assets/demo_inference.png" alt="Chromosome Segmentation Demo" width="700"/>
+  <p><em>Real-time instance segmentation on metaphase chromosome spread using ChromoSeg-YOLO.</em></p>
+</div>
+
+
 ## Key Features
 * Custom Boundary-Aware Loss: Integrated Dice-Focal and IoU loss functions tailored 
   for fine-grained overlapping biological boundaries.
