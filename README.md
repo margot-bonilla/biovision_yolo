@@ -26,9 +26,10 @@ Built on PyTorch and modern object detection/segmentation paradigms, ChromoSeg-Y
 ## Key Features
 
 - **Boundary-Aware Loss**: Integrated Dice-Focal and IoU loss formulations tailored for resolving fine-grained, overlapping biological boundaries.
+- **Automated Cytogenetics Data Pipeline**: Fast `.npz` dataset extraction and multi-instance grayscale mask to normalized YOLO polygon segmentation annotation parsing.
 - **Bio-Augmentation Pipeline**: Domain-specific transformations including elastic deformations, fluorescence intensity jittering, and morphological scaling.
 - **Cross-Platform Hardware Acceleration**: Automatic device detection supporting **NVIDIA CUDA** (Linux/Windows), **Apple Silicon MPS** (macOS Metal), and CPU fallback via `chromoseg.utils.get_device()`.
-- **Modular Engine**: Decoupled, extensible modules for model definition, training, evaluation, and inference.
+- **Modular Engine**: Decoupled, extensible modules for data parsing, model definition, training, evaluation, and inference.
 - **High-Speed Export & Deployment**: Optimized export pipeline targeting ONNX Runtime and TensorRT for high-throughput laboratory deployment.
 - **Experiment Tracking**: Integrated Weights & Biases (W&B) logging for monitoring mAP@50-95, boundary metrics, and resource utilization.
 
@@ -44,7 +45,9 @@ biovision_yolo/
 ├── chromoseg/              # Core Python package
 │   ├── __init__.py
 │   ├── utils.py            # Device management (CUDA / MPS / CPU) & helpers
-│   ├── data/               # Dataset loaders, bio-formats parsers & augmentations
+│   ├── data/               # Dataset extraction, parsers & augmentations
+│   │   ├── extract_npz.py  # Unpacks .npz archives into raw images and masks
+│   │   └── parser.py       # Converts instance masks to YOLO polygon format
 │   ├── engine/             # Training, evaluation, and inference engines
 │   │   ├── trainer.py      # Modular training loop with checkpointing & W&B
 │   │   ├── evaluator.py    # Metric calculation (mAP, Dice, boundary IoU)
@@ -53,12 +56,18 @@ biovision_yolo/
 │       ├── backbones.py    # Custom feature extractors & attention layers
 │       ├── losses.py       # Dice-Focal & boundary-aware loss layers
 │       └── yolo_wrapper.py # Segmentation model wrapper & export utilities
-├── data/                   # Dataset root (raw & processed cytogenetic data)
+├── data/                   # Dataset root
+│   ├── chromsome_data.npz  # Raw dataset archive
+│   ├── raw/                # Extracted images & multi-instance masks
+│   │   ├── images/         # Raw metaphase chromosome spread images
+│   │   └── masks/          # Raw instance segmentation masks
+│   └── processed/          # Processed YOLO format annotations
+│       └── labels/         # Normalized polygon label files (.txt)
 ├── deploy/                 # Deployment configs, ONNX / TensorRT export scripts
 ├── notebooks/              # Interactive Jupyter exploration and karyotyping analysis
 ├── weights/                # Model checkpoints and pre-trained weights
 ├── .env.example            # Environment variable configuration template
-├── Makefile                # Automated setup, installation, and maintenance tasks
+├── Makefile                # Automated setup, data pipeline, and maintenance tasks
 ├── pyproject.toml          # Package specifications and dependencies
 └── LICENSE                 # AGPL-3.0 License
 ```
@@ -133,6 +142,57 @@ DEVICE=cuda
 
 ---
 
+## Data Preparation Pipeline
+
+ChromoSeg-YOLO includes dedicated utilities to unpack raw cytogenetics archives and convert multi-instance masks into normalized YOLO segmentation polygons.
+
+### Automated Workflow via Makefile
+
+```bash
+# 1. Extract raw images and masks from .npz dataset
+make extract-data
+
+# 2. Parse instance masks into YOLO polygon label files
+make parse-data
+```
+
+> **Note**: Default paths can be overridden directly from the command line:
+> ```bash
+> make extract-data NPZ_FILE=path/to/data.npz DATA_DIR=data/
+> ```
+
+### Manual / CLI Workflow
+
+#### 1. Extracting `.npz` Archives
+Unpack the `.npz` archive into raw image and mask folders:
+```bash
+python chromoseg/data/extract_npz.py \
+    --npz_path data/chromsome_data.npz \
+    --output_dir data/
+```
+This generates:
+- `data/raw/images/spread_0000.png, ...`
+- `data/raw/masks/spread_0000.png, ...`
+
+#### 2. Parsing Masks to YOLO Segmentation Polygons
+Convert multi-instance grayscale masks into normalized YOLO polygon labels:
+```bash
+python chromoseg/data/parser.py \
+    --images_dir data/raw/images \
+    --masks_dir data/raw/masks \
+    --output_dir data/processed/labels
+```
+
+#### Segmentation Format Details
+The parser automatically:
+- Identifies individual chromosomes based on unique intensity values in the mask.
+- Extracts contours using `cv2.findContours`.
+- Filters out non-chromosome debris and imaging artifacts (contour area threshold < 50 px).
+- Normalizes polygon vertices to `[0, 1]` relative to image dimensions.
+- Produces YOLO segmentation format: `<class_id> <x1> <y1> <x2> <y2> ... <xn> <yn>`.
+
+---
+
 ## Quick Start
 
 ### Device Verification
@@ -167,7 +227,7 @@ from chromoseg.engine.predictor import Predictor
 
 predictor = Predictor(weights="weights/best.pt")
 results = predictor.predict(
-    source="data/test/metaphase_spread.jpg",
+    source="data/raw/images/spread_0001.png",
     conf_threshold=0.25,
     save=True
 )
