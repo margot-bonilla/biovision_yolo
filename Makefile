@@ -3,7 +3,7 @@ PYTHON ?= python3.11
 NPZ_FILE ?= data/chromsome_data.npz
 DATA_DIR ?= data/
 
-.PHONY: env install-mac install-cuda clean clean-data extract-data parse-data split-data prepare-data
+.PHONY: env install-mac install-cuda clean clean-data extract-data parse-data split-data prepare-data reset-data
 
 # Set up clean virtual environment
 env:
@@ -54,3 +54,6 @@ split-data:
 		--train_ratio 0.8
 
 prepare-data: extract-data parse-data split-data
+
+# Wipe and regenerate entire dataset from scratch
+reset-data: clean-data prepare-data

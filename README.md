@@ -279,7 +279,12 @@ Remove build cache, bytecode, and temporary files:
 make clean
 ```
 
-Reset all generated/extracted dataset files:
+Reset and re-extract/re-split dataset from scratch:
+```bash
+make reset-data
+```
+
+Wipe all extracted/generated dataset files:
 ```bash
 make clean-data
 ```
