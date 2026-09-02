@@ -3,6 +3,10 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# Raw data
+/data/processed
+/data/raw
+
 # C extensions
 *.so
 
@@ -202,6 +206,7 @@ cython_debug/
 # .vscode/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
+.DS_Store
 
 # Ruff stuff:
 .ruff_cache/
