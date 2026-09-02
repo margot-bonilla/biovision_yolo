@@ -1,0 +1,9 @@
+# Configuration for ChromoSeg-YOLO instance segmentation
+
+path: ./data/processed
+train: images/train
+val: images/val
+
+names:
+  0: "chromosome"
+

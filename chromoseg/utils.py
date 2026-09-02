@@ -1,5 +1,6 @@
 import torch
 
+
 def get_device() -> torch.device:
     """
     Returns the appropriate device (CPU, MPS, or GPU) for PyTorch operations.

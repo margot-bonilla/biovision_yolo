@@ -3,7 +3,7 @@ PYTHON ?= python3.11
 NPZ_FILE ?= data/chromsome_data.npz
 DATA_DIR ?= data/
 
-.PHONY: env install-mac install-cuda clean extract-data
+.PHONY: env install-mac install-cuda clean clean-data extract-data parse-data split-data prepare-data
 
 # Set up clean virtual environment
 env:
@@ -26,7 +26,12 @@ install-cuda:
 clean:
 	rm -rf build dist *.egg-info .pytest_cache
 	find . -type d -name "__pycache__" -exec rm -r {} +
-	
+	find . -name ".DS_Store" -delete
+
+# Clean generated data
+clean-data:
+	rm -rf $(DATA_DIR)raw $(DATA_DIR)processed
+
 # --- Data Preparation Targets ---
 extract-data:
 	@echo "Extracting data from $(NPZ_FILE) to $(DATA_DIR)..."
@@ -34,8 +39,18 @@ extract-data:
 
 parse-data:
 	@echo "Converting masks to YOLO polygon labels..."
-	mkdir -p $(DATA_DIR)processed/labels
+	mkdir -p $(DATA_DIR)raw/labels
 	$(PYTHON) chromoseg/data/parser.py \
 		--images_dir $(DATA_DIR)raw/images \
 		--masks_dir $(DATA_DIR)raw/masks \
-		--output_dir $(DATA_DIR)processed/labels
+		--output_dir $(DATA_DIR)raw/labels
+
+split-data:
+	@echo "Splitting dataset into training and validation sets..."
+	$(PYTHON) chromoseg/data/split.py \
+		--images_dir $(DATA_DIR)raw/images \
+		--labels_dir $(DATA_DIR)raw/labels \
+		--output_dir $(DATA_DIR)processed \
+		--train_ratio 0.8
+
+prepare-data: extract-data parse-data split-data

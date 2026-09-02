@@ -5,6 +5,7 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 
+
 def parse_to_yolo(mask: np.ndarray, class_id: int = 0) -> list:
     """
     Convert a binary mask to YOLO polygon format.
@@ -20,7 +21,8 @@ def parse_to_yolo(mask: np.ndarray, class_id: int = 0) -> list:
     yolo_lines = []
     height, width = mask.shape
 
-    # 1. Find all unique pixel intensities in the image (excluding the background, which is assumed to be 0)
+    # 1. Find all unique pixel intensities in the image
+    # (excluding background, assumed to be 0)
     unique_values = np.unique(mask)
 
     for value in unique_values:
@@ -31,7 +33,9 @@ def parse_to_yolo(mask: np.ndarray, class_id: int = 0) -> list:
         instance_mask = np.uint8(mask == value) * 255
 
         # 3. Find contours of the isolated chromosome
-        contours, _ = cv2.findContours(instance_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(
+            instance_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
 
         # 4. For each contour, convert it to YOLO polygon format
         for contour in contours:
@@ -43,7 +47,9 @@ def parse_to_yolo(mask: np.ndarray, class_id: int = 0) -> list:
             normalized_contour = contour.reshape(-1, 2) / np.array([width, height])
 
             # Flatten the normalized contour points and convert to string
-            polygon_str = ' '.join([f"{point:.6f}" for point in normalized_contour.flatten()])
+            polygon_str = " ".join(
+                [f"{point:.6f}" for point in normalized_contour.flatten()]
+            )
 
             # Create YOLO line with class_id and polygon points
             yolo_line = f"{class_id} {polygon_str}"
@@ -51,6 +57,7 @@ def parse_to_yolo(mask: np.ndarray, class_id: int = 0) -> list:
 
     # Placeholder for conversion logic
     return yolo_lines
+
 
 def process_dataset(images_dir: str, masks_dir: str, output_dir: str):
     """
@@ -62,10 +69,13 @@ def process_dataset(images_dir: str, masks_dir: str, output_dir: str):
         output_dir (str): Path to the output directory for YOLO polygon annotations.
     """
     # Placeholder for processing logic
-    print(f"Processing dataset with images from {images_dir}, masks from {masks_dir}, and saving output to {output_dir}.")
+    print(
+        f"Processing dataset from {images_dir}, masks from {masks_dir}, "
+        f"saving output to {output_dir}."
+    )
     # Here you would implement the logic to convert binary masks to YOLO polygon format.
 
-    os.makedirs(output_dir, exist_ok=True) 
+    os.makedirs(output_dir, exist_ok=True)
     mask_paths = list(Path(masks_dir).glob("*.png"))
 
     print(f"Found {len(mask_paths)} masks to process.")
@@ -78,11 +88,13 @@ def process_dataset(images_dir: str, masks_dir: str, output_dir: str):
                 continue
             yolo_lines = parse_to_yolo(mask)
             if yolo_lines:
-                output_mask_path = Path(output_dir) / mask_path.with_suffix('.txt').name
-                with open(output_mask_path, 'w') as f:
-                    f.write('\n'.join(yolo_lines))
+                output_mask_path = Path(output_dir) / mask_path.with_suffix(".txt").name
+                with open(output_mask_path, "w") as f:
+                    f.write("\n".join(yolo_lines))
             else:
-                print(f"Warning: No valid contours found in mask {mask_path}. Skipping.")
+                print(
+                    f"Warning: No valid contours found in mask {mask_path}. Skipping."
+                )
         except Exception as e:
             print(f"Error processing mask {mask_path}: {e}")
 
@@ -90,10 +102,21 @@ def process_dataset(images_dir: str, masks_dir: str, output_dir: str):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Convert binary masks to YOLO polygon format.")
-    parser.add_argument("--images_dir", type=str, required=True,help="Path to raw images directory.")
-    parser.add_argument("--masks_dir", type=str, required=True, help="Path to binary masks directory.")
-    parser.add_argument("--output_dir", type=str, required=True, help="Path to output directory for YOLO polygon annotations.")
+    parser = argparse.ArgumentParser(
+        description="Convert binary masks to YOLO polygon format."
+    )
+    parser.add_argument(
+        "--images_dir", type=str, required=True, help="Path to raw images directory."
+    )
+    parser.add_argument(
+        "--masks_dir", type=str, required=True, help="Path to binary masks directory."
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        required=True,
+        help="Path to output directory for YOLO polygon annotations.",
+    )
 
     args = parser.parse_args()
     process_dataset(args.images_dir, args.masks_dir, args.output_dir)

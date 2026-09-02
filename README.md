@@ -45,9 +45,10 @@ biovision_yolo/
 ├── chromoseg/              # Core Python package
 │   ├── __init__.py
 │   ├── utils.py            # Device management (CUDA / MPS / CPU) & helpers
-│   ├── data/               # Dataset extraction, parsers & augmentations
+│   ├── data/               # Dataset extraction, parsers, split & augmentations
 │   │   ├── extract_npz.py  # Unpacks .npz archives into raw images and masks
-│   │   └── parser.py       # Converts instance masks to YOLO polygon format
+│   │   ├── parser.py       # Converts instance masks to YOLO polygon format
+│   │   └── split.py        # Generates reproducible train/val dataset splits
 │   ├── engine/             # Training, evaluation, and inference engines
 │   │   ├── trainer.py      # Modular training loop with checkpointing & W&B
 │   │   ├── evaluator.py    # Metric calculation (mAP, Dice, boundary IoU)
@@ -58,17 +59,20 @@ biovision_yolo/
 │       └── yolo_wrapper.py # Segmentation model wrapper & export utilities
 ├── data/                   # Dataset root
 │   ├── chromsome_data.npz  # Raw dataset archive
-│   ├── raw/                # Extracted images & multi-instance masks
+│   ├── raw/                # Unpacked raw data & parsed labels
 │   │   ├── images/         # Raw metaphase chromosome spread images
-│   │   └── masks/          # Raw instance segmentation masks
-│   └── processed/          # Processed YOLO format annotations
-│       └── labels/         # Normalized polygon label files (.txt)
+│   │   ├── masks/          # Raw instance segmentation masks
+│   │   └── labels/         # Raw YOLO polygon label files (.txt)
+│   └── processed/          # Processed & split YOLO dataset
+│       ├── images/         # Split images (train/ & val/)
+│       └── labels/         # Split polygon label files (train/ & val/)
 ├── deploy/                 # Deployment configs, ONNX / TensorRT export scripts
 ├── notebooks/              # Interactive Jupyter exploration and karyotyping analysis
 ├── weights/                # Model checkpoints and pre-trained weights
 ├── .env.example            # Environment variable configuration template
 ├── Makefile                # Automated setup, data pipeline, and maintenance tasks
 ├── pyproject.toml          # Package specifications and dependencies
+├── dataset.yaml            # YOLO segmentation dataset configuration
 └── LICENSE                 # AGPL-3.0 License
 ```
 
@@ -144,21 +148,31 @@ DEVICE=cuda
 
 ## Data Preparation Pipeline
 
-ChromoSeg-YOLO includes dedicated utilities to unpack raw cytogenetics archives and convert multi-instance masks into normalized YOLO segmentation polygons.
+ChromoSeg-YOLO includes a full end-to-end data pipeline to unpack raw cytogenetics `.npz` archives, convert multi-instance masks into normalized YOLO polygon segmentation annotations, and generate reproducible train/validation splits.
 
 ### Automated Workflow via Makefile
 
+Run all data preparation steps in one command:
+```bash
+# Runs extract-data -> parse-data -> split-data
+make prepare-data
+```
+
+Or run individual pipeline steps:
 ```bash
 # 1. Extract raw images and masks from .npz dataset
 make extract-data
 
-# 2. Parse instance masks into YOLO polygon label files
+# 2. Parse multi-instance masks into YOLO polygon labels
 make parse-data
+
+# 3. Create reproducible train/val splits (80% train, 20% val)
+make split-data
 ```
 
-> **Note**: Default paths can be overridden directly from the command line:
+> **Note**: Default variables can be overridden from the command line:
 > ```bash
-> make extract-data NPZ_FILE=path/to/data.npz DATA_DIR=data/
+> make prepare-data NPZ_FILE=path/to/data.npz DATA_DIR=data/
 > ```
 
 ### Manual / CLI Workflow
@@ -170,9 +184,7 @@ python chromoseg/data/extract_npz.py \
     --npz_path data/chromsome_data.npz \
     --output_dir data/
 ```
-This generates:
-- `data/raw/images/spread_0000.png, ...`
-- `data/raw/masks/spread_0000.png, ...`
+Output: `data/raw/images/` and `data/raw/masks/`
 
 #### 2. Parsing Masks to YOLO Segmentation Polygons
 Convert multi-instance grayscale masks into normalized YOLO polygon labels:
@@ -180,7 +192,17 @@ Convert multi-instance grayscale masks into normalized YOLO polygon labels:
 python chromoseg/data/parser.py \
     --images_dir data/raw/images \
     --masks_dir data/raw/masks \
-    --output_dir data/processed/labels
+    --output_dir data/raw/labels
+```
+
+#### 3. Splitting into Train & Validation Sets
+Generate paired image and label directories in standard YOLO segmentation structure:
+```bash
+python chromoseg/data/split.py \
+    --images_dir data/raw/images \
+    --labels_dir data/raw/labels \
+    --output_dir data/processed \
+    --train_ratio 0.8
 ```
 
 #### Segmentation Format Details
@@ -212,7 +234,7 @@ from chromoseg.engine.trainer import Trainer
 
 # Initialize and launch training with custom configurations
 trainer = Trainer(
-    data_config="data/dataset.yaml",
+    data_config="dataset.yaml",
     model="chromoseg-yolov8-seg",
     epochs=100,
     imgsz=1024,
@@ -227,7 +249,7 @@ from chromoseg.engine.predictor import Predictor
 
 predictor = Predictor(weights="weights/best.pt")
 results = predictor.predict(
-    source="data/raw/images/spread_0001.png",
+    source="data/processed/images/val/spread_0001.png",
     conf_threshold=0.25,
     save=True
 )
@@ -251,10 +273,15 @@ flake8 chromoseg/
 pytest tests/
 ```
 
-### Clean Build Artifacts
+### Clean Build & Data Artifacts
 Remove build cache, bytecode, and temporary files:
 ```bash
 make clean
+```
+
+Reset all generated/extracted dataset files:
+```bash
+make clean-data
 ```
 
 ---
