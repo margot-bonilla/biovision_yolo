@@ -5,6 +5,53 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 
+def parse_to_yolo(mask: np.ndarray, class_id: int = 0) -> list:
+    """
+    Convert a binary mask to YOLO polygon format.
+
+    Args:
+        mask (np.ndarray): Binary mask image.
+        class_id (int): Class ID for the object in the mask.
+
+    Returns:
+        list: List of polygons in YOLO format.
+    """
+
+    yolo_lines = []
+    height, width = mask.shape
+
+    # 1. Find all unique pixel intensities in the image (excluding the background, which is assumed to be 0)
+    unique_values = np.unique(mask)
+
+    for value in unique_values:
+        if value >= 255:
+            continue
+
+        # 2. Isolate the current chromosome
+        instance_mask = np.uint8(mask == value) * 255
+
+        # 3. Find contours of the isolated chromosome
+        contours, _ = cv2.findContours(instance_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # 4. For each contour, convert it to YOLO polygon format
+        for contour in contours:
+            # Filter out dust and artifacts
+            if cv2.contourArea(contour) < 50:
+                continue
+
+            # Normalize the contour points to [0, 1] range
+            normalized_contour = contour.reshape(-1, 2) / np.array([width, height])
+
+            # Flatten the normalized contour points and convert to string
+            polygon_str = ' '.join([f"{point:.6f}" for point in normalized_contour.flatten()])
+
+            # Create YOLO line with class_id and polygon points
+            yolo_line = f"{class_id} {polygon_str}"
+            yolo_lines.append(yolo_line)
+
+    # Placeholder for conversion logic
+    return yolo_lines
+
 def process_dataset(images_dir: str, masks_dir: str, output_dir: str):
     """
     Process the dataset by converting binary masks to YOLO polygon format.
@@ -25,16 +72,17 @@ def process_dataset(images_dir: str, masks_dir: str, output_dir: str):
 
     for mask_path in tqdm(mask_paths, desc="Processing masks"):
         try:
-            # Load the binary mask
             mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
             if mask is None:
                 print(f"Warning: Could not read mask {mask_path}. Skipping.")
                 continue
-
-            # Here you would implement the conversion to YOLO polygon format
-            # For demonstration, we will just save the mask as is to the output directory
-            output_mask_path = Path(output_dir) / mask_path.name
-            cv2.imwrite(str(output_mask_path), mask)
+            yolo_lines = parse_to_yolo(mask)
+            if yolo_lines:
+                output_mask_path = Path(output_dir) / mask_path.with_suffix('.txt').name
+                with open(output_mask_path, 'w') as f:
+                    f.write('\n'.join(yolo_lines))
+            else:
+                print(f"Warning: No valid contours found in mask {mask_path}. Skipping.")
         except Exception as e:
             print(f"Error processing mask {mask_path}: {e}")
 
