@@ -57,3 +57,7 @@ prepare-data: extract-data parse-data split-data
 
 # Wipe and regenerate entire dataset from scratch
 reset-data: clean-data prepare-data
+
+train-model:
+	@echo "Starting model training..."
+	$(PYTHON) chromoseg/engine/trainer.py --data_config dataset.yaml --epochs 50 --img_size 256
