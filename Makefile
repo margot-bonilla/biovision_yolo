@@ -3,7 +3,7 @@ PYTHON ?= python3.11
 NPZ_FILE ?= data/chromsome_data.npz
 DATA_DIR ?= data/
 
-.PHONY: env install-mac install-cuda clean clean-data extract-data parse-data split-data prepare-data reset-data
+.PHONY: env install-mac install-cuda clean clean-data extract-data parse-data split-data prepare-data reset-data train-model evaluate-model
 
 # Set up clean virtual environment
 env:
@@ -60,4 +60,15 @@ reset-data: clean-data prepare-data
 
 train-model:
 	@echo "Starting model training..."
-	$(PYTHON) chromoseg/engine/trainer.py --data_config dataset.yaml --epochs 50 --img_size 256
+	$(PYTHON) chromoseg/engine/trainer.py \
+		--data_config dataset.yaml \
+		--epochs 50 \
+		--img_size 640
+
+evaluate-model:
+	@echo "Evaluating model performance..."
+	$(PYTHON) chromoseg/engine/evaluator.py \
+		--weights runs/segment/models/baseline/weights/best.pt \
+		--val data/processed/images/val \
+		--labels_dir data/processed/labels/val \
+		--img_size 640
