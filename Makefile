@@ -3,7 +3,7 @@ PYTHON ?= python3.11
 NPZ_FILE ?= data/chromsome_data.npz
 DATA_DIR ?= data/
 
-.PHONY: env install-mac install-cuda clean clean-data extract-data parse-data split-data prepare-data reset-data train-model evaluate-model
+.PHONY: env install-mac install-cuda clean clean-data extract-data parse-data split-data prepare-data reset-data train-model evaluate-model test
 
 # Set up clean virtual environment
 env:
@@ -72,3 +72,7 @@ evaluate-model:
 		--val data/processed/images/val \
 		--labels_dir data/processed/labels/val \
 		--img_size 640
+
+test:
+	@echo "Running automated test suite..."
+	$(PYTHON) -m pytest -v tests/

@@ -26,7 +26,7 @@ def parse_to_yolo(mask: np.ndarray, class_id: int = 0) -> list:
     unique_values = np.unique(mask)
 
     for value in unique_values:
-        if value >= 255:
+        if value == 0 or value >= 255:
             continue
 
         # 2. Isolate the current chromosome
