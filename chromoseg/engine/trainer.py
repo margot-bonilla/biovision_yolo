@@ -1,5 +1,48 @@
 import argparse
+import torch
 from ultralytics import YOLO
+from ultralytics.models.yolo.segment import SegmentationTrainer
+from ultralytics.utils.loss import v8SegmentationLoss
+from chromoseg.models.losses import CytogeneticsLoss
+
+
+class CustomCytogeneticsLoss(v8SegmentationLoss):
+    def __init__(self, model):
+        super().__init__(model)
+        self.bio_loss = CytogeneticsLoss(boundary_weight=0.5)
+
+    def single_mask_loss(self, gt_mask: torch.Tensor, pred: torch.Tensor, proto: torch.Tensor, xyxy: torch.Tensor, area: torch.Tensor) -> torch.Tensor:
+        pred_mask = torch.einsum("in,nhw->ihw", pred,proto)
+        pred_prob = pred_mask.sigmoid()
+
+        return self.bio_loss(pred_prob, gt_mask)
+
+class CytogeneticsTrainer(SegmentationTrainer):
+    def set_model_attributes(self):
+        super().set_model_attributes()
+        self.model.criterion = CustomCytogeneticsLoss(self.model)
+
+
+def train_cytogenetics(
+        data_config: str, 
+        epochs: int = 50, 
+        img_size: int = 640,
+        model_name: str = "yolo11n-seg.pt",
+        project: str = "models",
+        name: str = "baseline"
+    ):
+    model = YOLO(model_name)
+
+    model.train(
+        data=data_config,
+        epochs=epochs,
+        imgsz=img_size,
+        trainer=CytogeneticsTrainer,
+        project=project,
+        name=name,
+    )
+    print(f"Training completed. Results saved in {project}/{name}.")
+
 
 
 def train_baseline(
@@ -46,7 +89,8 @@ if __name__ == "__main__":
     arg_parser.add_argument("--name", type=str, default="baseline", help="Name of the training run (default: 'baseline').")
     args = arg_parser.parse_args()
 
-    train_baseline(
+    # train_baseline(
+    train_cytogenetics(
         data_config=args.data_config,
         epochs=args.epochs,
         img_size=args.img_size,
