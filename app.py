@@ -4,8 +4,14 @@ import numpy as np
 from PIL import Image
 from ultralytics import YOLO
 
-# 1. Load trained model (falls back to baseline if custom is still training)
-WEIGHTS_PATH = "runs/segment/models/baseline/weights/best.pt"
+# 1. Load trained model (falls back to baseline or pretrained if custom is not trained yet)
+if Path("runs/segment/models/chromoseg_2class/weights/best.pt").exists():
+    WEIGHTS_PATH = "runs/segment/models/chromoseg_2class/weights/best.pt"
+elif Path("runs/segment/models/baseline/weights/best.pt").exists():
+    WEIGHTS_PATH = "runs/segment/models/baseline/weights/best.pt"
+else:
+    WEIGHTS_PATH = "weights/yolo11n-seg.pt"
+
 model = YOLO(WEIGHTS_PATH)
 
 
@@ -21,22 +27,30 @@ def segment_chromosomes(input_img: Image.Image, conf_threshold: float = 0.25):
     annotated_bgr = res.plot()
     annotated_rgb = annotated_bgr[..., ::-1]  # Convert BGR to RGB
 
-    # 3. Clinical Count & Diagnostics
-    n_count = len(res.masks) if res.masks is not None else 0
+    # 3. Clinical Count & Diagnostics for 2 Classes (0: Chromosome, 1: Overlap)
+    n_chromosomes = 0
+    n_overlaps = 0
+    if res.boxes is not None and res.boxes.cls is not None:
+        classes = res.boxes.cls.cpu().numpy().astype(int)
+        n_chromosomes = int((classes == 0).sum())
+        n_overlaps = int((classes == 1).sum())
 
-    if n_count == 46:
-        status_md = f"### 🟢 **Karyotype Status: Normal Diploid (N = 46)**\n*Expected human chromosome complement detected.*"
-    elif n_count == 47:
-        status_md = f"### 🔴 **Karyotype Status: Hyperdiploid / Trisomy Risk (N = 47)**\n*Extra chromosome detected. Detailed band analysis recommended.*"
-    elif n_count == 45:
-        status_md = f"### 🔴 **Karyotype Status: Hypodiploid / Monosomy Risk (N = 45)**\n*Missing chromosome detected. Potential monosomy.*"
+    if n_overlaps > 0:
+        status_md = (
+            f"### ⚠️ **{n_overlaps} Overlap Junction(s) Detected!**\n"
+            f"*Segmented {n_chromosomes} chromosome body instances with {n_overlaps} touching/crossover junctions.*"
+        )
     else:
-        status_md = f"### ⚪ **Karyotype Status: Incomplete / Clustered Spread (N = {n_count})**\n*Partial metaphase spread detected.*"
+        status_md = (
+            f"### 🟢 **Clean Spread (0 Overlaps)**\n"
+            f"*Segmented {n_chromosomes} isolated chromosome bodies with zero touching artifacts.*"
+        )
 
     metrics = {
-        "Total Chromosomes Detected": n_count,
+        "Chromosomes Detected (Class 0)": n_chromosomes,
+        "Overlap Junctions (Class 1)": n_overlaps,
         "Detection Confidence Used": conf_threshold,
-        "Image Resolution": f"{input_img.width}x{input_img.height}",
+        "Image Resolution": f"{input_img.width} x {input_img.height}",
     }
 
     # 4. Extract individual chromosome cutouts for inspection

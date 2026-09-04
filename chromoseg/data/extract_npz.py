@@ -36,11 +36,11 @@ def extract_dataset(npz_path: str, output_dir: str):
 
             # Save image
             image_path = os.path.join(images_dir, f"spread_{i:04d}.png")
-            cv2.imwrite(str(image_path), image)
+            cv2.imwrite(str(image_path), image.astype(np.uint8))
 
             # Save mask
             mask_path = os.path.join(masks_dir, f"spread_{i:04d}.png")
-            cv2.imwrite(str(mask_path), mask)
+            cv2.imwrite(str(mask_path), mask.astype(np.uint8))
 
         print(
             f"Extraction completed. Images saved to {images_dir}, masks saved to {masks_dir}."

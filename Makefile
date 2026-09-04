@@ -1,5 +1,5 @@
-# Default Python interpreter (override per machine if needed, e.g., make env PYTHON=python)
-PYTHON ?= python3.11
+# Default Python interpreter (auto-detects .venv if present)
+PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 NPZ_FILE ?= data/chromsome_data.npz
 DATA_DIR ?= data/
 
@@ -63,7 +63,9 @@ train-model:
 	$(PYTHON) chromoseg/engine/trainer.py \
 		--data_config dataset.yaml \
 		--epochs 50 \
-		--img_size 640
+		--img_size 256 \
+		--name chromoseg_2class \
+		--model_name weights/yolo11n-seg.pt
 
 evaluate-model:
 	@echo "Evaluating model performance..."
@@ -71,7 +73,7 @@ evaluate-model:
 		--weights runs/segment/models/baseline/weights/best.pt \
 		--val data/processed/images/val \
 		--labels_dir data/processed/labels/val \
-		--img_size 640
+		--img_size 256
 
 test:
 	@echo "Running automated test suite..."

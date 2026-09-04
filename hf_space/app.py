@@ -31,32 +31,28 @@ def _predict(input_img: Image.Image, conf_threshold: float = 0.25):
     annotated_bgr = res.plot()
     annotated_rgb = annotated_bgr[..., ::-1]  # Convert BGR (OpenCV) to RGB (PIL/Gradio)
 
-    # C. Clinical Diagnostic Count & Interpretation
-    n_count = len(res.masks) if res.masks is not None else 0
+    # C. Clinical Diagnostic Count & Interpretation (0: Chromosome, 1: Overlap)
+    n_chromosomes = 0
+    n_overlaps = 0
+    if res.boxes is not None and res.boxes.cls is not None:
+        classes = res.boxes.cls.cpu().numpy().astype(int)
+        n_chromosomes = int((classes == 0).sum())
+        n_overlaps = int((classes == 1).sum())
 
-    if n_count == 46:
+    if n_overlaps > 0:
         status_md = (
-            f"### 🟢 **Karyotype Status: Normal Diploid (2n = 46)**\n"
-            f"*Standard human chromosome complement detected.*"
-        )
-    elif n_count == 47:
-        status_md = (
-            f"### 🔴 **Karyotype Status: Hyperdiploid / Trisomy Risk (2n = 47)**\n"
-            f"*Extra chromosome detected. Detailed band analysis recommended.*"
-        )
-    elif n_count == 45:
-        status_md = (
-            f"### 🔴 **Karyotype Status: Hypodiploid / Monosomy Risk (2n = 45)**\n"
-            f"*Missing chromosome detected. Potential numerical abnormality.*"
+            f"### ⚠️ **{n_overlaps} Overlap Junction(s) Detected!**\n"
+            f"*Segmented {n_chromosomes} chromosome body instances with {n_overlaps} touching/crossover junctions.*"
         )
     else:
         status_md = (
-            f"### ⚪ **Karyotype Status: Partial / Clustered Spread (N = {n_count})**\n"
-            f"*Metaphase spread detected with {n_count} segmented chromosome instances.*"
+            f"### 🟢 **Clean Spread (0 Overlaps)**\n"
+            f"*Segmented {n_chromosomes} isolated chromosome bodies with zero touching artifacts.*"
         )
 
     metrics = {
-        "Total Chromosomes Detected": n_count,
+        "Chromosomes Detected (Class 0)": n_chromosomes,
+        "Overlap Junctions (Class 1)": n_overlaps,
         "Detection Confidence Used": conf_threshold,
         "Image Dimensions": f"{input_img.width} x {input_img.height}",
     }

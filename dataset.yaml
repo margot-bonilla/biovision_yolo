@@ -6,4 +6,5 @@ val: images/val
 
 names:
   0: "chromosome"
+  1: "overlap"
 

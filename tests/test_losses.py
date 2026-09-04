@@ -4,7 +4,7 @@ import pytest
 
 from chromoseg.models.losses import (
     dice_focal_loss,
-    compute_sdf,
+    extract_boundary,
     boundary_loss,
     CytogeneticsLoss,
 )
@@ -33,34 +33,31 @@ def test_dice_focal_loss_values_and_gradients():
     assert not torch.isnan(wrong_pred.grad).any()
 
 
-def test_compute_sdf_signs():
-    """Test Signed Distance Function: negative inside mask, zero on border, positive outside."""
-    mask = np.zeros((20, 20), dtype=np.uint8)
+def test_extract_boundary_gpu():
+    """Test pure PyTorch GPU morphological boundary extraction."""
+    mask = torch.zeros((20, 20), dtype=torch.float32)
     # Center square chromosome from [5:15, 5:15]
-    mask[5:15, 5:15] = 1
+    mask[5:15, 5:15] = 1.0
 
-    sdf = compute_sdf(mask)
+    boundary = extract_boundary(mask)
 
-    assert isinstance(sdf, np.ndarray)
-    assert sdf.shape == (20, 20)
+    assert isinstance(boundary, torch.Tensor)
+    assert boundary.shape == (20, 20)
 
-    # Center of chromosome should be negative (inside)
-    assert sdf[10, 10] < 0.0
+    # Deep interior and exterior should have zero boundary intensity
+    assert boundary[10, 10] == 0.0
+    assert boundary[0, 0] == 0.0
 
-    # Outside corners should be positive (outside)
-    assert sdf[0, 0] > 0.0
-    assert sdf[19, 19] > 0.0
-
-    # Outside distance grows as you move further away
-    assert sdf[0, 0] > sdf[4, 4]
+    # The contour perimeter should have positive boundary intensity
+    assert boundary[5, 5] > 0.0
 
 
 def test_boundary_loss_differentiability():
-    """Test that boundary loss computes correct penalty and supports autograd."""
-    sdf_map = torch.tensor([[-2.0, -1.0], [1.0, 4.0]], dtype=torch.float32)
+    """Test that pure GPU boundary loss computes correct penalty and supports autograd."""
     pred_mask = torch.tensor([[0.8, 0.7], [0.1, 0.2]], dtype=torch.float32, requires_grad=True)
+    true_mask = torch.tensor([[1.0, 1.0], [0.0, 0.0]], dtype=torch.float32)
 
-    loss = boundary_loss(pred_mask, sdf_map)
+    loss = boundary_loss(pred_mask, true_mask)
     assert isinstance(loss, torch.Tensor)
 
     loss.backward()

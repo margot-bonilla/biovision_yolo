@@ -35,35 +35,50 @@ def dice_focal_loss(
     return total_loss
 
 
-def compute_sdf(true_mask: np.ndarray) -> np.ndarray:
+def extract_boundary(mask: torch.Tensor, kernel_size: int = 3) -> torch.Tensor:
     """
-    Computes Signed Distance Function (SDF) for a binary mask
-        - Negative: inside the chromosome
-        - Positive: outside the chromosome
+    Pure PyTorch GPU-accelerated morphological boundary extraction.
+    Uses Max Pooling to perform morphological dilation and erosion on device.
     """
-    postmask = true_mask.astype(bool)
-    negmask = ~postmask
+    orig_shape = mask.shape
+    if mask.ndim == 2:
+        mask_4d = mask.unsqueeze(0).unsqueeze(0)
+    elif mask.ndim == 3:
+        mask_4d = mask.unsqueeze(1)
+    else:
+        mask_4d = mask
 
-    # Distance to the boundary from iside and outside
-    out_dist = distance_transform_edt(negmask)
-    in_dist = distance_transform_edt(postmask)
+    pad = kernel_size // 2
+    # Morphological Dilation on GPU
+    dilated = F.max_pool2d(mask_4d, kernel_size=kernel_size, stride=1, padding=pad)
+    # Morphological Erosion on GPU
+    eroded = 1.0 - F.max_pool2d(1.0 - mask_4d, kernel_size=kernel_size, stride=1, padding=pad)
 
-    # Combine into Signed Distance Map
-    sdf = out_dist - in_dist
+    # Boundary is the morphological gradient (Dilation - Erosion)
+    boundary = dilated - eroded
+    return boundary.view(orig_shape)
 
-    return sdf
 
-def boundary_loss(pred_mask: torch.Tensor, sdf_map: torch.Tensor):
+def boundary_loss(pred_mask: torch.Tensor, true_mask: torch.Tensor, smooth: float = 1e-6) -> torch.Tensor:
     """
-    Integral of predicted probabilities multiplied by distance map
+    Pure PyTorch GPU Boundary Loss:
+    Measures boundary alignment between predicted and ground truth masks in microseconds.
     """
+    pred_boundary = extract_boundary(pred_mask)
+    true_boundary = extract_boundary(true_mask)
 
-    return (pred_mask * sdf_map).mean()
+    intersection = (pred_boundary * true_boundary).sum()
+    union = pred_boundary.sum() + true_boundary.sum()
+
+    boundary_dice = (2.0 * intersection + smooth) / (union + smooth)
+    return 1.0 - boundary_dice
+
 
 class CytogeneticsLoss(torch.nn.Module):
     """
     Combined Cytogenetics Instance Segmentation Loss:
         L_total = L_Dice_Focal + (boundary_weight * L_boundary)
+    Fully accelerated on GPU/MPS with zero CPU transfers.
     """
 
     def __init__(self, alpha: float = 0.25, gamma: float = 2.0, boundary_weight: float = 0.5):
@@ -73,15 +88,10 @@ class CytogeneticsLoss(torch.nn.Module):
         self.boundary_weight = boundary_weight
 
     def forward(self, pred_mask: torch.Tensor, true_mask: torch.Tensor) -> torch.Tensor:
-        # Compute Dice-Focla loss
+        # 1. Compute Dice-Focal loss
         df_loss = dice_focal_loss(pred_mask=pred_mask, true_mask=true_mask, alpha=self.alpha, gamma=self.gamma)
 
-        # Compute Signed Distance Function for the ground truth
-        true_mask_np = true_mask.detach().cpu().numpy()
-        sdf_np = compute_sdf(true_mask_np)
-        sdf_tensor = torch.from_numpy(sdf_np).float().to(pred_mask.device)
-
-        # Compute boundary loss
-        b_loss = boundary_loss(pred_mask, sdf_tensor)
+        # 2. Compute Pure GPU Boundary loss
+        b_loss = boundary_loss(pred_mask=pred_mask, true_mask=true_mask)
 
         return df_loss + self.boundary_weight * b_loss

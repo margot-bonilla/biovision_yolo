@@ -6,95 +6,95 @@ from pathlib import Path
 from tqdm import tqdm
 
 
-def parse_to_yolo(mask: np.ndarray, class_id: int = 0) -> list:
+def parse_to_yolo(image: np.ndarray, mask: np.ndarray) -> list:
     """
-    Convert a binary mask to YOLO polygon format.
-
-    Args:
-        mask (np.ndarray): Binary mask image.
-        class_id (int): Class ID for the object in the mask.
-
-    Returns:
-        list: List of polygons in YOLO format.
+    Extracts 2 distinct classes into YOLO normalized polygon format:
+      - Class 0: 'chromosome' (Individual chromosome contours from Channel 0 & Channel 1)
+      - Class 1: 'overlap' (Dense crossover / overlap junction from Channel 0 & Channel 1 intersection)
     """
-
     yolo_lines = []
-    height, width = mask.shape
+    height, width = mask.shape[:2]
 
-    # 1. Find all unique pixel intensities in the image
-    # (excluding background, assumed to be 0)
-    unique_values = np.unique(mask)
+    # Handle multi-channel vs single-channel masks
+    if mask.ndim == 3 and mask.shape[2] >= 2:
+        # Channel 0: Chromosome 1, Channel 1: Chromosome 2
+        c1_binary = (mask[:, :, 0] < 200).astype(np.uint8) * 255
+        c2_binary = (mask[:, :, 1] < 200).astype(np.uint8) * 255
+        overlap_binary = ((c1_binary > 0) & (c2_binary > 0)).astype(np.uint8) * 255
 
-    for value in unique_values:
-        if value == 0 or value >= 255:
-            continue
-
-        # 2. Isolate the current chromosome
-        instance_mask = np.uint8(mask == value) * 255
-
-        # 3. Find contours of the isolated chromosome
-        contours, _ = cv2.findContours(
-            instance_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
-
-        # 4. For each contour, convert it to YOLO polygon format
-        for contour in contours:
-            # Filter out dust and artifacts
+        # Class 0: Chromosome 1 contours
+        cnts1, _ = cv2.findContours(c1_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for contour in cnts1:
             if cv2.contourArea(contour) < 50:
                 continue
+            norm_pts = contour.reshape(-1, 2) / np.array([width, height])
+            poly_str = " ".join([f"{p:.6f}" for p in norm_pts.flatten()])
+            yolo_lines.append(f"0 {poly_str}")
 
-            # Normalize the contour points to [0, 1] range
-            normalized_contour = contour.reshape(-1, 2) / np.array([width, height])
+        # Class 0: Chromosome 2 contours
+        cnts2, _ = cv2.findContours(c2_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for contour in cnts2:
+            if cv2.contourArea(contour) < 50:
+                continue
+            norm_pts = contour.reshape(-1, 2) / np.array([width, height])
+            poly_str = " ".join([f"{p:.6f}" for p in norm_pts.flatten()])
+            yolo_lines.append(f"0 {poly_str}")
 
-            # Flatten the normalized contour points and convert to string
-            polygon_str = " ".join(
-                [f"{point:.6f}" for point in normalized_contour.flatten()]
-            )
+        # Class 1: Overlap Junction contours
+        cnts_ov, _ = cv2.findContours(overlap_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for contour in cnts_ov:
+            if cv2.contourArea(contour) < 20:
+                continue
+            norm_pts = contour.reshape(-1, 2) / np.array([width, height])
+            poly_str = " ".join([f"{p:.6f}" for p in norm_pts.flatten()])
+            yolo_lines.append(f"1 {poly_str}")
 
-            # Create YOLO line with class_id and polygon points
-            yolo_line = f"{class_id} {polygon_str}"
-            yolo_lines.append(yolo_line)
+    else:
+        # Fallback for single-channel masks
+        gray_mask = mask[:, :, 0] if mask.ndim == 3 else mask
+        chrom_binary = (gray_mask < 200).astype(np.uint8) * 255
+        chrom_contours, _ = cv2.findContours(
+            chrom_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
+        for contour in chrom_contours:
+            if cv2.contourArea(contour) < 50:
+                continue
+            norm_pts = contour.reshape(-1, 2) / np.array([width, height])
+            poly_str = " ".join([f"{p:.6f}" for p in norm_pts.flatten()])
+            yolo_lines.append(f"0 {poly_str}")
 
-    # Placeholder for conversion logic
     return yolo_lines
 
 
 def process_dataset(images_dir: str, masks_dir: str, output_dir: str):
     """
-    Process the dataset by converting binary masks to YOLO polygon format.
+    Process the dataset by converting masks to 2-class YOLO polygon format.
 
     Args:
         images_dir (str): Path to the directory containing raw images.
-        masks_dir (str): Path to the directory containing binary masks.
+        masks_dir (str): Path to the directory containing masks.
         output_dir (str): Path to the output directory for YOLO polygon annotations.
     """
-    # Placeholder for processing logic
-    print(
-        f"Processing dataset from {images_dir}, masks from {masks_dir}, "
-        f"saving output to {output_dir}."
-    )
-    # Here you would implement the logic to convert binary masks to YOLO polygon format.
-
     os.makedirs(output_dir, exist_ok=True)
     mask_paths = list(Path(masks_dir).glob("*.png"))
 
-    print(f"Found {len(mask_paths)} masks to process.")
+    print(f"Processing {len(mask_paths)} masks to 2-class YOLO format (0: chromosome, 1: overlap)...")
 
     for mask_path in tqdm(mask_paths, desc="Processing masks"):
         try:
-            mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
-            if mask is None:
-                print(f"Warning: Could not read mask {mask_path}. Skipping.")
+            # Read multi-channel mask preserving all channels
+            mask = cv2.imread(str(mask_path), cv2.IMREAD_UNCHANGED)
+            img_path = Path(images_dir) / mask_path.name
+            image = cv2.imread(str(img_path), cv2.IMREAD_UNCHANGED)
+
+            if mask is None or image is None:
                 continue
-            yolo_lines = parse_to_yolo(mask)
+
+            yolo_lines = parse_to_yolo(image=image, mask=mask)
             if yolo_lines:
                 output_mask_path = Path(output_dir) / mask_path.with_suffix(".txt").name
                 with open(output_mask_path, "w") as f:
                     f.write("\n".join(yolo_lines))
-            else:
-                print(
-                    f"Warning: No valid contours found in mask {mask_path}. Skipping."
-                )
         except Exception as e:
             print(f"Error processing mask {mask_path}: {e}")
 

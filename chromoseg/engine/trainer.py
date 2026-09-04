@@ -26,7 +26,7 @@ class CytogeneticsTrainer(SegmentationTrainer):
 def train_cytogenetics(
         data_config: str, 
         epochs: int = 50, 
-        img_size: int = 640,
+        img_size: int = 256,
         model_name: str = "yolo11n-seg.pt",
         project: str = "models",
         name: str = "baseline"
@@ -48,7 +48,7 @@ def train_cytogenetics(
 def train_baseline(
         data_config: str,
         epochs: int = 100,
-        img_size: int = 640,
+        img_size: int = 256,
         model_name: str = "yolo11n-seg.pt",
         project: str = "models",
         name: str = "baseline",
@@ -82,14 +82,13 @@ def train_baseline(
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(description="Train a YOLOv8 model on the dataset.")
     arg_parser.add_argument("--data_config", type=str, required=True, help="Path to the data configuration file.")
-    arg_parser.add_argument("--epochs", type=int, default=100, help="Number of training epochs (default: 100).")
-    arg_parser.add_argument("--img_size", type=int, default=640, help="Image size for training (default: 640).")
-    arg_parser.add_argument("--model_name", type=str, default="yolo11n-seg.pt", help="Pretrained model name or path (default: 'yolo11n-seg.pt').")
+    arg_parser.add_argument("--epochs", type=int, default=50, help="Number of training epochs (default: 50).")
+    arg_parser.add_argument("--img_size", type=int, default=256, help="Image size for training (default: 256).")
+    arg_parser.add_argument("--model_name", type=str, default="weights/yolo11n-seg.pt", help="Pretrained model name or path (default: 'weights/yolo11n-seg.pt').")
     arg_parser.add_argument("--project", type=str, default="models", help="Project directory to save training results (default: 'models').")
-    arg_parser.add_argument("--name", type=str, default="baseline", help="Name of the training run (default: 'baseline').")
+    arg_parser.add_argument("--name", type=str, default="chromoseg_2class", help="Name of the training run (default: 'chromoseg_2class').")
     args = arg_parser.parse_args()
 
-    # train_baseline(
     train_cytogenetics(
         data_config=args.data_config,
         epochs=args.epochs,

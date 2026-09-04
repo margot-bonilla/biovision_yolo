@@ -4,7 +4,7 @@ import cv2
 from ultralytics import YOLO
 import numpy as np
 
-def compute_count_metrics(weights: str, val: str, img_size: int = 640) -> dict:
+def compute_count_metrics(weights: str, val: str, img_size: int = 256) -> dict:
     """
     Evaluates Chromosome Count Error (△N) and Chromosome Classification Error (CCE).
     """
@@ -46,7 +46,7 @@ def compute_overlap_metrics(
     weights: str,
     val: str,
     labels_dir: str = "data/processed/labels/val",
-    img_size: int = 640,
+    img_size: int = 256,
 ) -> dict:
     """
     Evaluates segmentation accuracy on isolated vs. touching/overlapping chromosomes.
@@ -170,7 +170,7 @@ def cytogenetics_evaluator(
     weights: str,
     val: str = "data/processed/images/val",
     labels_dir: str = "data/processed/labels/val",
-    img_size: int = 640,
+    img_size: int = 256,
 ) -> dict:
     """
     Main evaluation pipeline running both Count Error and Overlap Analysis.
@@ -229,8 +229,8 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--img_size",
         type=int,
-        default=640,
-        help="Image size for evaluation (default: 640).",
+        default=256,
+        help="Image size for evaluation (default: 256).",
     )
     args = arg_parser.parse_args()
 

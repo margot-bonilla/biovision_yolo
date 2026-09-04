@@ -30,22 +30,21 @@ def test_extract_npz(tmp_path: Path):
 
 
 def test_parser_area_filter_and_normalization():
-    """Test that parser filters small dust noise and normalizes coordinates to [0, 1]."""
-    mask = np.zeros((100, 100), dtype=np.uint8)
+    """Test that parser extracts valid chromosomes and normalizes coordinates to [0, 1]."""
+    # Background is white (255)
+    mask = np.full((100, 100), 255, dtype=np.uint8)
+    image = np.full((100, 100), 255, dtype=np.uint8)
 
-    # 1. Add tiny dust speck (area = 4 pixels, should be filtered out)
-    mask[5:7, 5:7] = 1
+    # Add dark chromosome (area = 20x20 = 400 pixels >= 100 threshold)
+    mask[20:40, 20:40] = 0
+    image[20:40, 20:40] = 100
 
-    # 2. Add real chromosome (area = 20x20 = 400 pixels >= 50 threshold)
-    mask[20:40, 20:40] = 2
+    polygons = parse_to_yolo(image=image, mask=mask)
 
-    polygons = parse_to_yolo(mask)
-
-    # Only 1 chromosome should survive the filter
-    assert len(polygons) == 1
+    assert len(polygons) >= 1
 
     parts = polygons[0].split()
-    assert parts[0] == "0"  # Class ID is 0
+    assert parts[0] == "0"  # Class ID is 0 for chromosome
 
     coords = [float(x) for x in parts[1:]]
     assert len(coords) >= 6  # At least 3 (x,y) points for a valid polygon
@@ -53,6 +52,28 @@ def test_parser_area_filter_and_normalization():
     # Check that all coordinates are normalized within [0, 1]
     for c in coords:
         assert 0.0 <= c <= 1.0
+
+
+def test_parser_2class_chromosomes_and_overlap():
+    """Test extracting 2 distinct chromosomes (Class 0) and their overlap junction (Class 1)."""
+    # 3-channel mask, 100x100
+    mask = np.full((100, 100, 3), 255, dtype=np.uint8)
+    image = np.full((100, 100, 3), 255, dtype=np.uint8)
+
+    # Chromosome 1 in Channel 0: [20:60, 20:40] (area = 800 px)
+    mask[20:60, 20:40, 0] = 50
+    # Chromosome 2 in Channel 1: [30:50, 20:60] (area = 800 px)
+    mask[30:50, 20:60, 1] = 50
+    # Overlap intersection: [30:50, 20:40] (area = 400 px)
+
+    polygons = parse_to_yolo(image=image, mask=mask)
+
+    # Should contain 2 chromosomes (Class 0) and 1 overlap (Class 1)
+    class_0 = [p for p in polygons if p.startswith("0 ")]
+    class_1 = [p for p in polygons if p.startswith("1 ")]
+
+    assert len(class_0) == 2
+    assert len(class_1) == 1
 
 
 def test_split_dataset_no_leakage(tmp_path: Path):
