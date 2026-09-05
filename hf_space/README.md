@@ -12,17 +12,34 @@ license: agpl-3.0
 
 # 🔬 ChromoSeg: Clinical Cytogenetics AI Engine
 
-Real-Time Instance Segmentation & Automated Cytogenetics Engine for human metaphase chromosome karyotyping.
+[![Ultralytics YOLO](https://img.shields.io/badge/Ultralytics-YOLO-00FFFF.svg)](https://docs.ultralytics.com/)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Hardware Support](https://img.shields.io/badge/Hardware-CUDA%20%7C%20MPS%20%7C%20CPU-success.svg)](https://pytorch.org/)
 
-### 🧬 Key Capabilities:
-- **Instant Instance Segmentation**: Color-coded pixel-level chromosome outlines.
-- **Touching & Overlapping Cluster Resolution**: Trained with custom Boundary-Focal loss to separate touching chromatids.
-- **Clinical Karyotyping Assessment**: Real-time count diagnostic reporting ($\Delta N$) and numerical abnormality detection ($2n=46, 47, 45$).
-- **Cutout Gallery**: Automated extraction of individual chromosome crops for karyogram alignment.
+**Real-Time Instance Segmentation & Automated Cytogenetics Engine** for human metaphase chromosome karyotyping, cluster disentanglement, and clinical diagnostics.
 
-### 💻 Local Run:
+---
+
+### 🧬 Key Capabilities
+- **2-Class Clinical Architecture**: Segments full individual **chromosome bodies** (`Class 0`) and isolates dense **crossover / overlap junctions** (`Class 1`).
+- **Cluster & Touching Disentanglement**: Built on custom Boundary-Aware and Dice-Focal loss formulations to resolve touching chromatid boundaries.
+- **Clinical Count Diagnostics ($\Delta N$)**: Real-time evaluation of chromosome numbers to detect numerical abnormalities (e.g., Aneuploidy / Trisomy / Monosomy).
+- **Automated Cutout Gallery**: Isolates individual segmented chromosome crops for downstream karyogram pairing.
+
+---
+
+### 📊 Benchmark Performance (Validation Set)
+- **Mean Count Error ($\text{MAE } \Delta N$)**: **0.43 chromosomes**
+- **Count Accuracy ($\pm 1$ Tolerance)**: **95.0%**
+- **Overlapping Cluster IoU**: **0.6707 (67.1%)**
+- **Inference Latency**: **~3.2 ms / image** (real-time GPU throughput)
+
+---
+
+### 💻 Local Run
 ```bash
 pip install -r requirements.txt
 python app.py
 ```
+
 

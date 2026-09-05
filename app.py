@@ -4,8 +4,10 @@ import numpy as np
 from PIL import Image
 from ultralytics import YOLO
 
-# 1. Load trained model (falls back to baseline or pretrained if custom is not trained yet)
-if Path("runs/segment/models/chromoseg_2class/weights/best.pt").exists():
+# 1. Load trained model (checks weights/best.pt, runs/ models, or fallback to base)
+if Path("weights/best.pt").exists():
+    WEIGHTS_PATH = "weights/best.pt"
+elif Path("runs/segment/models/chromoseg_2class/weights/best.pt").exists():
     WEIGHTS_PATH = "runs/segment/models/chromoseg_2class/weights/best.pt"
 elif Path("runs/segment/models/baseline/weights/best.pt").exists():
     WEIGHTS_PATH = "runs/segment/models/baseline/weights/best.pt"

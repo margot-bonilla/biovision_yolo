@@ -6,7 +6,7 @@ DATA_DIR ?= data/
 .PHONY: env install-mac install-cuda clean clean-data extract-data parse-data split-data prepare-data reset-data train-model evaluate-model retrain pipeline test
 
 # Default weights for evaluation
-WEIGHTS ?= runs/segment/models/chromoseg_2class/weights/best.pt
+WEIGHTS ?= $(if $(wildcard weights/best.pt),weights/best.pt,runs/segment/models/chromoseg_2class/weights/best.pt)
 
 # Set up clean virtual environment
 env:
