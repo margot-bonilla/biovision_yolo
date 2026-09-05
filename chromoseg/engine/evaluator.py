@@ -155,7 +155,7 @@ def compute_overlap_metrics(
     # =========================================================================
     mean_isolated = float(np.mean(isolated_ious)) if isolated_ious else 0.0
     mean_overlapping = float(np.mean(overlapping_ious)) if overlapping_ious else 0.0
-    degradation_gap = mean_isolated - mean_overlapping
+    degradation_gap = (mean_isolated - mean_overlapping) if isolated_ious else 0.0
 
     return {
         "isolated_mean_iou": mean_isolated,
@@ -175,6 +175,16 @@ def cytogenetics_evaluator(
     """
     Main evaluation pipeline running both Count Error and Overlap Analysis.
     """
+    weights_path = Path(weights)
+    if not weights_path.exists():
+        # Smart fallback: search for other best.pt weights in runs/
+        candidates = sorted(Path("runs/segment/models").glob("**/weights/best.pt"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if candidates:
+            print(f"⚠️ Warning: Specified weights '{weights}' not found. Using most recent weights: {candidates[0]}")
+            weights = str(candidates[0])
+        else:
+            raise FileNotFoundError(f"No model weights found at '{weights}' or in 'runs/segment/models/'.")
+
     print(f"\nEvaluating weights: {weights}")
     print(f"Validation dataset: {val}")
 
@@ -196,9 +206,13 @@ def cytogenetics_evaluator(
     print(f"   - Within ±1 Tolerance (△N≤1) : {count_results['within_1_count_acc']:.1f}%")
 
     print("\n2. Overlap & Touching Segmentation:")
-    print(f"   - Isolated Chromosomes IoU   : {overlap_results['isolated_mean_iou']:.4f} ({overlap_results['n_isolated']} instances)")
-    print(f"   - Overlapping Clusters IoU   : {overlap_results['overlapping_mean_iou']:.4f} ({overlap_results['n_overlapping']} instances)")
-    print(f"   - Overlap Degradation Gap    : {overlap_results['overlap_degradation_gap']:.4f}")
+    if overlap_results['n_isolated'] > 0:
+        print(f"   - Isolated Chromosomes IoU   : {overlap_results['isolated_mean_iou']:.4f} ({overlap_results['n_isolated']} instances)")
+        print(f"   - Overlapping Clusters IoU   : {overlap_results['overlapping_mean_iou']:.4f} ({overlap_results['n_overlapping']} instances)")
+        print(f"   - Overlap Degradation Gap    : {overlap_results['overlap_degradation_gap']:.4f}")
+    else:
+        print(f"   - Overlapping Clusters IoU   : {overlap_results['overlapping_mean_iou']:.4f} ({overlap_results['n_overlapping']} instances)")
+        print("   - Isolated Chromosomes       : N/A (100% of benchmark slides feature touching/overlapping clusters)")
     print("=" * 50 + "\n")
 
     return {**count_results, **overlap_results}

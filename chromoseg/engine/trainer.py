@@ -29,7 +29,7 @@ def train_cytogenetics(
         img_size: int = 256,
         model_name: str = "yolo11n-seg.pt",
         project: str = "models",
-        name: str = "baseline"
+        name: str = "chromoseg_2class"
     ):
     model = YOLO(model_name)
 
@@ -40,6 +40,7 @@ def train_cytogenetics(
         trainer=CytogeneticsTrainer,
         project=project,
         name=name,
+        exist_ok=True,
     )
     print(f"Training completed. Results saved in {project}/{name}.")
 
