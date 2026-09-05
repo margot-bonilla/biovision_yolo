@@ -3,7 +3,10 @@ PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 NPZ_FILE ?= data/chromsome_data.npz
 DATA_DIR ?= data/
 
-.PHONY: env install-mac install-cuda clean clean-data extract-data parse-data split-data prepare-data reset-data train-model evaluate-model test
+.PHONY: env install-mac install-cuda clean clean-data extract-data parse-data split-data prepare-data reset-data train-model evaluate-model retrain pipeline test
+
+# Default weights for evaluation
+WEIGHTS ?= runs/segment/models/chromoseg_2class/weights/best.pt
 
 # Set up clean virtual environment
 env:
@@ -70,10 +73,16 @@ train-model:
 evaluate-model:
 	@echo "Evaluating model performance..."
 	$(PYTHON) chromoseg/engine/evaluator.py \
-		--weights runs/segment/models/baseline/weights/best.pt \
+		--weights $(WEIGHTS) \
 		--val data/processed/images/val \
 		--labels_dir data/processed/labels/val \
 		--img_size 256
+
+# Full end-to-end retrain: clean -> extract -> parse -> split -> train
+retrain: reset-data train-model
+
+# Full end-to-end pipeline: clean -> extract -> parse -> split -> train -> evaluate
+pipeline: reset-data train-model evaluate-model
 
 test:
 	@echo "Running automated test suite..."
